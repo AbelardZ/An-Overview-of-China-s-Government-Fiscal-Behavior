@@ -1,0 +1,592 @@
+---
+title: "An Overview of China's Government Fiscal Behavior"
+format: html
+editor: visual
+author: 张颢严
+---
+
+😉
+
+## GDP和一般公共预算收入（全国）增速对比
+
+```{r}
+# 加载必要的包
+library(readxl)
+library(dplyr)
+library(ggplot2)
+
+# 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\GDPvs预算收入.xlsx")
+# 将中文列名转换为英文
+colnames(data) <- c("Index", "Year", "GDP", "PublicRevenue")
+
+# 清理数据，移除空行
+data <- data %>% filter(!is.na(Year))
+
+# 仅保留1992-2023年的数据
+data <- data %>% filter(Year >= 1992 & Year <= 2023)
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 计算GDP增速和一般公共预算收入增速
+data <- data %>%
+  mutate(GDP_Growth = (GDP - lag(GDP)) / lag(GDP) * 100,
+         PublicRevenue_Growth = (PublicRevenue - lag(PublicRevenue)) / lag(PublicRevenue) * 100)
+
+# 移除第一行（因为增速计算会产生NA）
+data <- data %>% filter(!is.na(GDP_Growth))
+
+# 绘制折线图
+ggplot(data, aes(x = Year)) +
+  geom_line(aes(y = GDP_Growth, color = "GDP Growth"), group = 1) +
+  geom_line(aes(y = PublicRevenue_Growth, color = "Public Revenue Growth"), group = 1) +
+  labs(title = "GDP Growth vs Public Revenue Growth (1992-2023)",
+       x = "Year",
+       y = "Growth Rate (%)",
+       color = "Indicator") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1992, 2023, by = 5),  # 每5年显示一个标签
+                     labels = seq(1992, 2023, by = 5)) +  # 标签与 breaks 一致
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # 旋转横轴标签，避免重叠
+
+# 绘制散点图
+ggplot(data, aes(x = GDP_Growth, y = PublicRevenue_Growth)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Scatter Plot of GDP Growth vs Public Revenue Growth (1992-2023)",
+       x = "GDP Growth (%)",
+       y = "Public Revenue Growth (%)") +
+  theme_minimal()
+
+# 计算相关系数
+correlation <- cor(data$GDP_Growth, data$PublicRevenue_Growth, use = "complete.obs")
+print(paste("The correlation coefficient between GDP Growth and Public Revenue Growth is:", correlation))
+```
+
+## 一般公共预算收入的细分Ⅰ
+
+```{r}
+# 加载必要的库
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+# 读取 Excel 文件
+df <- read_excel("C:\\Users\\zhy\\Desktop\\财政支出细分.xlsx")
+
+# 如果列名不正确，手动设置列名
+colnames(df) <- c("Index", "Year", "Total_Revenue", "Tax_Revenue", "Domestic_VAT", "Non_Tax_Revenue", "GDP","PublicExpenditure")
+
+# 检查数据类型
+str(df)
+
+# 将 Year 列转换为数值型
+df$Year <- as.numeric(df$Year)
+
+# 将 Tax_Revenue、Non_Tax_Revenue 和 GDP 列转换为数值型
+df$Tax_Revenue <- as.numeric(df$Tax_Revenue)
+df$Non_Tax_Revenue <- as.numeric(df$Non_Tax_Revenue)
+df$GDP <- as.numeric(df$GDP)
+
+# 移除包含缺失值的行
+df <- df %>% drop_na(Tax_Revenue, Non_Tax_Revenue, GDP)
+
+# 再次检查数据
+head(df)
+
+# 1. 绘制税收收入和非税收入的面积堆积图
+ggplot(df, aes(x = Year)) +
+  geom_area(aes(y = Tax_Revenue, fill = "Tax Revenue"), alpha = 0.6) +
+  geom_area(aes(y = Non_Tax_Revenue, fill = "Non-Tax Revenue"), alpha = 0.6) +
+  labs(
+    title = "Tax Revenue and Non-Tax Revenue (Stacked Area Chart)",
+    x = "Year",
+    y = "Revenue (亿 yuan)",
+    fill = "Revenue Type"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Tax Revenue" = "blue", "Non-Tax Revenue" = "red"),  # 确保值与 fill 映射一致
+    breaks = c("Tax Revenue", "Non-Tax Revenue")  # 明确指定 breaks
+  )
+
+# 2. 计算税收收入、非税收入和 GDP 的增速
+df <- df %>%
+  mutate(
+    Tax_Growth_Rate = (Tax_Revenue - lag(Tax_Revenue)) / lag(Tax_Revenue) * 100,
+    Non_Tax_Growth_Rate = (Non_Tax_Revenue - lag(Non_Tax_Revenue)) / lag(Non_Tax_Revenue) * 100,
+    GDP_Growth_Rate = (GDP - lag(GDP)) / lag(GDP) * 100
+  )
+
+# 移除增速计算中的缺失值
+df <- df %>% drop_na(Tax_Growth_Rate, Non_Tax_Growth_Rate, GDP_Growth_Rate)
+
+# 查看增速数据
+head(df)
+
+# 绘制税收收入、非税收入和 GDP 增速的折线图
+ggplot(df, aes(x = Year, group = 1)) +  # 明确指定 group = 1
+  geom_line(aes(y = Tax_Growth_Rate, color = "Tax Revenue Growth Rate"), size = 1) +
+  geom_line(aes(y = Non_Tax_Growth_Rate, color = "Non-Tax Revenue Growth Rate"), size = 1) +
+  geom_line(aes(y = GDP_Growth_Rate, color = "GDP Growth Rate"), size = 1) +
+  labs(
+    title = "Tax Revenue, Non-Tax Revenue, and GDP Growth Rate",
+    x = "Year",
+    y = "Growth Rate (%)",
+    color = "Growth Rate Type"
+  ) +
+  theme_minimal() +
+  scale_color_manual(
+    values = c(
+      "Tax Revenue Growth Rate" = "blue",
+      "Non-Tax Revenue Growth Rate" = "red",
+      "GDP Growth Rate" = "green"  # 添加 GDP 增速的颜色
+    )
+  )
+
+# 3. 计算税收收入和非税收入的相关性
+correlation <- cor(df$Tax_Revenue, df$Non_Tax_Revenue, use = "complete.obs")
+print(paste("Correlation between Tax Revenue and Non-Tax Revenue:", round(correlation, 2)))
+
+# 绘制税收收入和非税收入的散点图
+ggplot(df, aes(x = Tax_Revenue, y = Non_Tax_Revenue)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", color = "red", linetype = "dashed") +
+  labs(
+    title = "Scatter Plot: Tax Revenue vs Non-Tax Revenue",
+    x = "Tax Revenue (亿 yuan)",
+    y = "Non-Tax Revenue (亿 yuan)"
+  ) +
+  theme_minimal()
+```
+
+## 一般公共预决算收入细分Ⅱ
+
+```{r}
+# 加载必要的库
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# 读取 Excel 文件
+df <- read_excel("C:\\Users\\zhy\\Desktop\\细分的公共决算收入.xlsx")
+
+
+
+# 转换列名为英文
+colnames(df) <- c("Index", "Year", "LocalRevenue", "CorporateTax", "PersonalTax", "VAT", "OtherTax", "PenaltyRevenue", "NonTaxRevenue", "AdministrativeFees")
+
+# 检查数据类型
+str(df)
+
+# 将 Year 列转换为数值型
+df$Year <- as.numeric(df$Year)
+
+# 筛选 2007-2023 年的数据
+df <- df %>% filter(Year >= 2007 & Year <= 2023)
+
+# 移除包含缺失值的行
+df <- df %>% drop_na(CorporateTax, PersonalTax, VAT, PenaltyRevenue, AdministrativeFees)
+
+# 计算税收总收入和非税总收入
+df <- df %>%
+  mutate(
+    TotalTaxRevenue = CorporateTax + PersonalTax + VAT + OtherTax,  # 税收总收入
+    TotalNonTaxRevenue = PenaltyRevenue + AdministrativeFees        # 非税总收入
+  )
+
+# 1. 绘制税收收入面积堆积图（包含税收总收入）
+ggplot(df, aes(x = Year)) +
+  geom_area(aes(y = CorporateTax, fill = "企业所得税"), alpha = 0.6) +
+  geom_area(aes(y = PersonalTax, fill = "个人所得税"), alpha = 0.6) +
+  geom_area(aes(y = VAT, fill = "国内增值税"), alpha = 0.6) +
+  geom_area(aes(y = OtherTax, fill = "其他税收"), alpha = 0.6) +
+  geom_area(aes(y = TotalTaxRevenue, fill = "税收总收入"), alpha = 0.6) +  # 添加税收总收入
+  labs(
+    title = "2007-2023 年税收收入（企业所得税、个人所得税、国内增值税、其他税收、税收总收入）",
+    x = "年份",
+    y = "金额（亿元）",
+    fill = "税收类型"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c(
+      "企业所得税" = "skyblue",
+      "个人所得税" = "pink",
+      "国内增值税" = "green",
+      "其他税收" = "orange",
+      "税收总收入" = "purple"  # 设置税收总收入颜色
+    )
+  ) +
+  scale_x_continuous(breaks = seq(2007, 2023, by = 2))  # 每两年显示一个年份标签
+
+# 2. 绘制非税收入面积堆积图（包含非税总收入）
+ggplot(df, aes(x = Year)) +
+  geom_area(aes(y = PenaltyRevenue, fill = "罚没收入"), alpha = 0.6) +
+  geom_area(aes(y = AdministrativeFees, fill = "行政事业性收费"), alpha = 0.6) +
+  geom_area(aes(y = TotalNonTaxRevenue, fill = "非税总收入"), alpha = 0.6) +  # 添加非税总收入
+  labs(
+    title = "2007-2023 年非税收入（罚没收入、行政事业性收费、非税总收入）",
+    x = "年份",
+    y = "金额（亿元）",
+    fill = "非税收入类型"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c(
+      "罚没收入" = "purple",
+      "行政事业性收费" = "pink",
+      "非税总收入" = "gray"  # 设置非税总收入颜色
+    )
+  ) +
+  scale_x_continuous(breaks = seq(2007, 2023, by = 2))  # 每两年显示一个年份标签
+```
+
+## GDP和一般公共预算支出（全国）增速对比
+
+```{r}
+# 加载必要的包
+library(readxl)
+library(dplyr)
+library(ggplot2)
+
+# 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\GDPvs预算支出.xlsx")
+
+# 将中文列名转换为英文
+colnames(data) <- c("Index", "Year", "PublicExpenditure", "GDP")
+
+# 清理数据，移除空行
+data <- data %>% filter(!is.na(Year))
+
+# 仅保留1992-2023年的数据
+data <- data %>% filter(Year >= 1992 & Year <= 2023)
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 计算预算支出增速和GDP增速
+data <- data %>%
+  mutate(PublicExpenditure_Growth = (PublicExpenditure - lag(PublicExpenditure)) / lag(PublicExpenditure) * 100,
+         GDP_Growth = (GDP - lag(GDP)) / lag(GDP) * 100)
+
+# 移除第一行（因为增速计算会产生NA）
+data <- data %>% filter(!is.na(PublicExpenditure_Growth))
+
+# 绘制折线图
+ggplot(data, aes(x = Year)) +
+  geom_line(aes(y = PublicExpenditure_Growth, color = "Public Expenditure Growth"), group = 1) +
+  geom_line(aes(y = GDP_Growth, color = "GDP Growth"), group = 1) +
+  labs(title = "Public Expenditure Growth vs GDP Growth (1992-2023)",
+       x = "Year",
+       y = "Growth Rate (%)",
+       color = "Indicator") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1992, 2023, by = 5),  # 每5年显示一个标签
+                     labels = seq(1992, 2023, by = 5)) +  # 标签与 breaks 一致
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # 旋转横轴标签，避免重叠
+
+# 绘制散点图
+ggplot(data, aes(x = GDP_Growth, y = PublicExpenditure_Growth)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Scatter Plot of Public Expenditure Growth vs GDP Growth (1992-2023)",
+       x = "GDP Growth (%)",
+       y = "Public Expenditure Growth (%)") +
+  theme_minimal()
+
+# 计算相关系数
+correlation <- cor(data$GDP_Growth, data$PublicExpenditure_Growth, use = "complete.obs")
+print(paste("The correlation coefficient between Public Expenditure Growth and GDP Growth is:", correlation))
+```
+
+## 一般公共预决算收入细分Ⅰ
+
+```{r}
+# 加载必要的包
+library(readxl)  # 用于读取Excel文件
+library(ggplot2) # 用于绘图
+library(reshape2) # 用于数据转换
+
+# 1. 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\细分公共预算支出.xlsx")
+
+# 2. 转换列名为英文
+colnames(data) <- c("Index", "Year", "Total_Expenditure", "Public_Services", "Diplomacy", "Defense", "Public_Security", "Education", "Science_Technology", "Culture_Sports_Media", "Social_Security_Employment", "Healthcare_Family_Planning", "Energy_Conservation_Environmental_Protection", "Urban_Rural_Community_Affairs", "Agriculture_Forestry_Water_Affairs", "Transportation", "Resource_Exploration_Electricity_Information", "Commerce_Services", "Financial_Regulation", "Aid_Other_Regions", "Housing_Security", "Grain_Material_Reserves", "National_Debt_Repayment", "Other_Expenditure", "Fiscal_Revenue")
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 3. 筛选2007-2023年的数据
+data_filtered <- data[data$Year >= 2007 & data$Year <= 2023, ]
+
+# 4. 选择需要的列
+selected_data <- data_filtered[, c("Year", "Total_Expenditure", "Education", "Healthcare_Family_Planning", "Social_Security_Employment", "Defense", "Public_Security")]
+
+# 5. 将数据转换为长格式
+long_data <- melt(selected_data, id.vars = "Year", variable.name = "Expenditure_Type", value.name = "Expenditure_Amount")
+
+# 6. 绘制面积堆积图
+ggplot(long_data, aes(x = Year, y = Expenditure_Amount, fill = Expenditure_Type)) +
+  geom_area() +
+  labs(title = "2007-2023 Fiscal Expenditure Stacked Area Chart",
+       x = "Year",
+       y = "Expenditure Amount",
+       fill = "Expenditure Type") +
+  theme_minimal()
+```
+
+## 财政收入vs支出
+
+```{r}
+# 加载必要的包
+library(readxl)
+library(dplyr)
+library(ggplot2)
+
+# 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\收入vs支出.xlsx")
+
+
+# 将中文列名转换为英文
+colnames(data) <- c("Year", "PublicRevenue", "PublicExpenditure")
+
+# 清理数据，移除空行
+data <- data %>% filter(!is.na(Year))
+
+# 仅保留1992-2023年的数据
+data <- data %>% filter(Year >= 1992 & Year <= 2023)
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 绘制绝对值对比折线图
+ggplot(data, aes(x = Year)) +
+  geom_line(aes(y = PublicRevenue, color = "Public Revenue"), group = 1) +
+  geom_line(aes(y = PublicExpenditure, color = "Public Expenditure"), group = 1) +
+  labs(title = "Public Revenue vs Public Expenditure (1992-2023)",
+       x = "Year",
+       y = "Amount (亿)",
+       color = "Indicator") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(1992, 2023, by = 5),  # 每5年显示一个标签
+                     labels = seq(1992, 2023, by = 5)) +  # 标签与 breaks 一致
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # 旋转横轴标签，避免重叠
+
+# 绘制绝对值对比散点图
+ggplot(data, aes(x = PublicRevenue, y = PublicExpenditure)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Scatter Plot of Public Revenue vs Public Expenditure (1992-2023)",
+       x = "Public Revenue (亿)",
+       y = "Public Expenditure (亿)") +
+  theme_minimal()
+
+# 计算绝对值相关系数
+correlation <- cor(data$PublicRevenue, data$PublicExpenditure, use = "complete.obs")
+print(paste("The correlation coefficient between Public Revenue and Public Expenditure is:", correlation))
+```
+
+## 财政收支平衡
+
+```{r}
+# 加载必要的包
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\表格.xlsx")
+
+# 将中文列名转换为英文
+colnames(data) <- c("Year", "GDP", "PublicRevenue", "PublicExpenditure", "DebtInterestPayment")
+
+# 清理数据，移除空行
+data <- data %>% filter(!is.na(Year))
+
+# 仅保留2007年以后的数据
+data <- data %>% filter(Year >= 2007)
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 拆分一般公共预算支出为非利息支出和利息支出
+data <- data %>%
+  mutate(NonInterestExpenditure = PublicExpenditure - DebtInterestPayment,
+         InterestExpenditure = DebtInterestPayment)
+
+# 将数据转换为长格式，便于绘图
+data_long <- data %>%
+  pivot_longer(cols = c(NonInterestExpenditure, InterestExpenditure),
+               names_to = "ExpenditureType",
+               values_to = "ExpenditureValue")
+
+# 绘制面积堆积图和折线图
+ggplot() +
+  # 绘制非利息支出和利息支出的面积堆积图
+  geom_area(data = data_long, aes(x = Year, y = ExpenditureValue, fill = ExpenditureType), alpha = 0.6) +
+  # 绘制一般公共预算收入的折线图
+  geom_line(data = data, aes(x = Year, y = PublicRevenue, color = "Public Revenue"), size = 1.2) +
+  # 设置标题和标签
+  labs(title = "Public Expenditure Breakdown and Revenue (2007-2023)",
+       x = "Year",
+       y = "Amount (亿)",
+       fill = "Expenditure Type",
+       color = "Indicator") +
+  # 设置横轴标注间隔
+  scale_x_continuous(breaks = seq(2007, 2023, by = 2)) +
+  # 设置颜色和图例
+  scale_fill_manual(values = c("NonInterestExpenditure" = "skyblue", "InterestExpenditure" = "orange")) +
+  scale_color_manual(values = c("Public Revenue" = "red")) +
+  # 设置主题
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## 一般公共预算收入细分
+
+```{r}
+# 加载必要的包
+library(readxl)
+library(dplyr)
+library(gridExtra)
+
+# 读取Excel文件
+data <- read_excel("C:\\Users\\zhy\\Desktop\\细分公共预算支出.xlsx")
+
+# 将中文列名转换为英文
+colnames(data) <- c("Index", "Year", "TotalExpenditure", "GeneralPublicServices", "Diplomacy", "Defense", "PublicSafety", 
+                    "Education", "ScienceTechnology", "CultureSportsMedia", "SocialSecurityEmployment", "HealthcareFamilyPlanning", 
+                    "EnergyConservationEnvironmentalProtection", "UrbanRuralCommunityAffairs", "AgricultureForestryWater", 
+                    "Transportation", "ResourceExplorationElectricityInformation", "CommerceServices", "FinancialRegulation", 
+                    "AidOtherRegions", "HousingSecurity", "GrainMaterialReserves", "DebtInterestPayment", "OtherExpenditure", 
+                    "PublicRevenue")
+
+# 清理数据，移除空行
+data <- data %>% filter(!is.na(Year))
+
+# 仅保留2007-2023年的数据
+data <- data %>% filter(Year >= 2007 & Year <= 2023)
+
+# 确保 Year 是数值型
+data$Year <- as.numeric(data$Year)
+
+# 将所有支出列转换为数值型
+data <- data %>%
+  mutate(across(TotalExpenditure:OtherExpenditure, as.numeric))
+
+# 计算各项支出的 CAGR
+growth_rates <- data %>%
+  summarise(across(TotalExpenditure:OtherExpenditure, 
+                   ~ (last(.) / first(.))^(1 / (n() - 1)) - 1, 
+                   .names = "CAGR_{col}"))
+
+# 计算每项支出的标准差
+std_dev <- data %>%
+  summarise(across(TotalExpenditure:OtherExpenditure, 
+                   ~ sd((. - lag(.)) / lag(.) * 100, na.rm = TRUE), 
+                   .names = "StdDev_{col}"))
+
+# 标记异常值（增速超过平均值 ± 2倍标准差）
+anomalies <- data %>%
+  mutate(across(TotalExpenditure:OtherExpenditure, 
+                ~ ifelse(abs((. - lag(.)) / lag(.) * 100 - mean((. - lag(.)) / lag(.) * 100, na.rm = TRUE)) > 
+                           2 * sd((. - lag(.)) / lag(.) * 100, na.rm = TRUE), "异常", "正常"), 
+                .names = "Anomaly_{col}"))
+
+# 汇总异常值总数
+anomaly_counts <- anomalies %>%
+  summarise(across(starts_with("Anomaly"), ~ sum(. == "异常", na.rm = TRUE)))
+
+# 输出结果
+result <- data.frame(
+  Category = gsub("CAGR_", "", colnames(growth_rates)),  # 去掉 "CAGR_" 前缀
+  AverageGrowthRate = as.numeric(-growth_rates[1, ]),
+  StandardDeviation = as.numeric(std_dev[1, ]),
+  Anomalies = as.numeric(anomaly_counts[1, ])
+)
+
+
+
+# 将 result 转换为表格图形对象
+table_grob <- gridExtra::tableGrob(result, theme = gridExtra::ttheme_minimal(base_size = 10))
+
+# 使用 ggplot2 绘制表格
+p <- ggplot() +
+  annotation_custom(table_grob, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+  theme_void()  # 使用空白主题
+
+# 保存为图片
+ggsave("result_table.png", p, width = 12, height = 8, dpi = 300)
+
+```
+
+## 政府专项债券发行vs城镇固投
+
+```{r}
+# 加载必要的库
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+df <- read_excel("C:\\Users\\zhy\\Desktop\\债券发行额vs固投.xlsx")
+
+# 转换列名为英文
+colnames(df) <- c("Index", "Date", "LocalGovBond", "FixedAssetInvestment")
+
+# 检查数据类型
+str(df)
+
+# 将 Date 列转换为日期格式
+df$Date <- as.Date(paste0(df$Date, "-01"), format = "%Y-%m-%d")
+
+# 将 LocalGovBond 和 FixedAssetInvestment 列转换为数值型
+df$LocalGovBond <- as.numeric(df$LocalGovBond)
+df$FixedAssetInvestment <- as.numeric(df$FixedAssetInvestment)
+
+# 筛选 2018 年至今的数据
+df <- df %>% filter(Date >= as.Date("2018-01-01"))
+
+# 移除包含缺失值的行
+df <- df %>% drop_na(LocalGovBond, FixedAssetInvestment)
+
+# 再次检查数据
+head(df)
+
+# 绘制折线图
+ggplot(df, aes(x = Date)) +
+  geom_line(aes(y = LocalGovBond, color = "地方政府专项债券发行额"), size = 1) +
+  geom_line(aes(y = FixedAssetInvestment, color = "城镇固定资产投资完成额"), size = 1) +
+  labs(
+    title = "2018年至今地方政府专项债券发行额与城镇固定资产投资完成额",
+    x = "日期",
+    y = "金额（亿元）",
+    color = "指标"
+  ) +
+  theme_minimal() +
+  scale_color_manual(
+    values = c("地方政府专项债券发行额" = "blue", "城镇固定资产投资完成额" = "red")
+  ) +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "6 months") +  # 每6个月显示一个日期标签
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # 旋转 x 轴标签
+
+
+# 1. 绘制散点图
+ggplot(df, aes(x = LocalGovBond, y = FixedAssetInvestment)) +
+  geom_point(color = "blue", size = 3) +  # 绘制散点
+  geom_smooth(method = "lm", color = "red", linetype = "dashed") +  # 添加线性拟合线
+  labs(
+    title = "地方政府专项债券发行额 vs 城镇固定资产投资完成额",
+    x = "地方政府专项债券发行额（亿元）",
+    y = "城镇固定资产投资完成额（亿元）"
+  ) +
+  theme_minimal()
+
+# 2. 计算相关性
+correlation <- cor(df$LocalGovBond, df$FixedAssetInvestment, use = "complete.obs")
+print(paste("地方政府专项债券发行额与城镇固定资产投资完成额的相关性为:", round(correlation, 2)))
+```
